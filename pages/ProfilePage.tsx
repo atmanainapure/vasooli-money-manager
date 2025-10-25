@@ -212,6 +212,11 @@ const ProfilePage: React.FC = () => {
                     Sign Out
                 </button>
             </div>
+
+            <div className="text-center text-slate-500 text-sm mt-8 pt-6 border-t border-slate-700">
+                <p>Made with ❤️</p>
+                <p>Atman.AInapure</p>
+            </div>
         </div>
     </div>
   );

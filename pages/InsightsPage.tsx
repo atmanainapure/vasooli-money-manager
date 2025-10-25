@@ -93,29 +93,6 @@ const InsightsPage: React.FC = () => {
     }
     return null;
   };
-  
-  const FilterButtons = () => (
-    <div className="flex justify-center mb-6 bg-slate-900/50 p-1 rounded-lg border border-slate-700 w-full max-w-xs mx-auto">
-      <button
-        onClick={() => setTimeFilter('this_month')}
-        className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md focus:outline-none transition-colors ${timeFilter === 'this_month' ? 'bg-cyan-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}
-      >
-        This Month
-      </button>
-      <button
-        onClick={() => setTimeFilter('last_month')}
-        className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md focus:outline-none transition-colors ${timeFilter === 'last_month' ? 'bg-cyan-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}
-      >
-        Last Month
-      </button>
-      <button
-        onClick={() => setTimeFilter('all_time')}
-        className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md focus:outline-none transition-colors ${timeFilter === 'all_time' ? 'bg-cyan-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}
-      >
-        All Time
-      </button>
-    </div>
-  );
 
   return (
     <div className="p-4">
@@ -124,7 +101,26 @@ const InsightsPage: React.FC = () => {
         <p className="text-slate-400">Your Spending Summary</p>
       </header>
 
-      <FilterButtons />
+      <div className="flex justify-center mb-6 bg-slate-800 p-1 rounded-lg border border-slate-700 w-full max-w-xs mx-auto">
+        <button
+          onClick={() => setTimeFilter('this_month')}
+          className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md focus:outline-none transition-colors ${timeFilter === 'this_month' ? 'bg-cyan-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}
+        >
+          This Month
+        </button>
+        <button
+          onClick={() => setTimeFilter('last_month')}
+          className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md focus:outline-none transition-colors ${timeFilter === 'last_month' ? 'bg-cyan-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}
+        >
+          Last Month
+        </button>
+        <button
+          onClick={() => setTimeFilter('all_time')}
+          className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md focus:outline-none transition-colors ${timeFilter === 'all_time' ? 'bg-cyan-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}
+        >
+          All Time
+        </button>
+      </div>
 
       <div className="bg-slate-800 p-4 rounded-lg shadow border border-slate-700">
         <h2 className="text-xl font-semibold text-center mb-2 text-white">Total Share ({periodText}): ₹{totalSpent.toFixed(2)}</h2>

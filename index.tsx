@@ -16,15 +16,15 @@ root.render(
 
 // Register the service worker for PWA capabilities
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    // Construct the full URL to the service worker to ensure it's loaded from the correct origin.
-    const swUrl = `${window.location.origin}/service-worker.js`;
-    navigator.serviceWorker.register(swUrl)
-      .then(registration => {
-        console.log('Service Worker registered with scope:', registration.scope);
-      })
-      .catch(error => {
-        console.error('Service Worker registration failed:', error);
-      });
-  });
+  // Register the service worker immediately as the script loads.
+  // This avoids race conditions in specific sandboxed environments where waiting for
+  // 'load' or 'DOMContentLoaded' can result in an invalid document state.
+  const swUrl = `${window.location.origin}/service-worker.js`;
+  navigator.serviceWorker.register(swUrl)
+    .then(registration => {
+      console.log('Service Worker registered with scope:', registration.scope);
+    })
+    .catch(error => {
+      console.error('Service Worker registration failed:', error);
+    });
 }

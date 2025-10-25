@@ -4,10 +4,10 @@ import { signInWithPopup } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 const LoginPage: React.FC = () => {
-  const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<{ message: string; hostname?: string }>({ message: '' });
 
   const handleGoogleSignIn = async () => {
-    setError(null);
+    setErrorDetails({ message: '' });
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
@@ -23,18 +23,56 @@ const LoginPage: React.FC = () => {
           email: user.email,
           avatarUrl: user.photoURL || `https://i.pravatar.cc/150?u=${user.uid}`,
           monthlyLimit: 0,
+          notificationPreferences: {
+            onAddedToTransaction: true,
+            onGroupExpenseAdded: true,
+            onSettlement: true,
+          }
         });
       }
     } catch (err: any) {
       console.error("Error signing in with Google: ", err);
       if (err.code === 'auth/unauthorized-domain') {
-        setError(
-          'This domain is not authorized for authentication. Please add it to the list of authorized domains in your Firebase console under Authentication > Settings > Authorized domains.'
-        );
+        const hostname = window.location.hostname;
+        setErrorDetails({
+          message: `This domain is not authorized for authentication. Please add it to the list of authorized domains in your Firebase console.`,
+          hostname: hostname
+        });
       } else {
-        setError('An unexpected error occurred during sign-in. Please try again.');
+        setErrorDetails({ message: 'An unexpected error occurred during sign-in. Please try again.' });
       }
     }
+  };
+
+  const renderError = () => {
+    if (!errorDetails.message) return null;
+
+    if (errorDetails.hostname) {
+        return (
+            <div className="bg-rose-500/20 border border-rose-500 text-rose-300 px-4 py-3 rounded-md relative mb-6 max-w-md text-left" role="alert">
+                <strong className="font-bold block mb-2">Configuration Needed</strong>
+                <p className="mb-2">{errorDetails.message}</p>
+                <p className="mb-2">You need to add the following domain to your project:</p>
+                <code className="bg-slate-700 text-white font-mono p-2 rounded-md block text-center my-2">{errorDetails.hostname}</code>
+                <a 
+                    href="https://console.firebase.google.com/" 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-cyan-400 hover:underline font-semibold"
+                >
+                    Go to Firebase Console &rarr;
+                </a>
+                <p className="text-xs text-slate-400 mt-2">Navigate to: Build &rarr; Authentication &rarr; Settings &rarr; Authorized domains.</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-rose-500/20 border border-rose-500 text-rose-300 px-4 py-3 rounded-md relative mb-6 max-w-md" role="alert">
+            <strong className="font-bold">Login Error: </strong>
+            <span className="block sm:inline">{errorDetails.message}</span>
+        </div>
+    );
   };
 
   return (
@@ -44,12 +82,7 @@ const LoginPage: React.FC = () => {
         <p className="text-slate-400 mt-2">Paise do warna Sooli pe chadha denge</p>
       </div>
       
-      {error && (
-        <div className="bg-rose-500/20 border border-rose-500 text-rose-300 px-4 py-3 rounded-md relative mb-6 max-w-md" role="alert">
-          <strong className="font-bold">Login Error: </strong>
-          <span className="block sm:inline">{error}</span>
-        </div>
-      )}
+      {renderError()}
 
       <button 
         onClick={handleGoogleSignIn}

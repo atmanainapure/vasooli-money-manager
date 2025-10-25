@@ -14,12 +14,19 @@ export enum SplitMethod {
   SHARES = 'shares',
 }
 
+export interface NotificationPreferences {
+  onAddedToTransaction: boolean;
+  onGroupExpenseAdded: boolean;
+  onSettlement: boolean;
+}
+
 export interface User {
   id: string;
   name: string;
   avatarUrl: string;
   email: string;
   monthlyLimit?: number;
+  notificationPreferences?: NotificationPreferences;
 }
 
 export interface Expense {

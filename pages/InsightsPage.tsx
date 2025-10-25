@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { useData } from '../context/DataContext';
-import { Category, Expense } from '../types';
+import { Category, Expense, SplitMethod } from '../types';
 
 const COLORS: Record<string, string> = {
     [Category.SELF]: '#a78bfa', // Violet
@@ -14,23 +14,63 @@ const COLORS: Record<string, string> = {
     [Category.OTHER]: '#9ca3af', // Gray
 };
 
+type TimeFilter = 'this_month' | 'last_month' | 'all_time';
+
 const InsightsPage: React.FC = () => {
   const { currentUser, groups, loading } = useData();
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('this_month');
 
   if (loading) return <div className="p-4 text-center">Loading insights...</div>;
   if (!currentUser) return <div className="p-4 text-center">Please log in to see your insights.</div>;
 
-  const userExpenses: Expense[] = groups
-    .flatMap(g => g.transactions)
-    .filter((tx): tx is Expense => 'paidById' in tx && tx.splitBetween.includes(currentUser.id))
-    .map(tx => {
-        // This is a simplification; a proper share calculation would consider split method
-        const share = tx.amount / tx.splitBetween.length;
-        return { ...tx, amount: share };
+  const filteredUserExpenses = useMemo(() => {
+    if (!currentUser || !groups) return [];
+
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    const lastMonthDate = new Date();
+    lastMonthDate.setMonth(now.getMonth() - 1);
+    const lastMonth = lastMonthDate.getMonth();
+    const lastMonthYear = lastMonthDate.getFullYear();
+
+    const allExpenses = groups
+      .flatMap(g => g.transactions)
+      .filter((tx): tx is Expense => 'paidById' in tx);
+
+    const timeFilteredExpenses = allExpenses.filter(expense => {
+      const expenseDate = new Date(expense.date);
+      if (timeFilter === 'this_month') {
+        return expenseDate.getMonth() === currentMonth && expenseDate.getFullYear() === currentYear;
+      }
+      if (timeFilter === 'last_month') {
+        return expenseDate.getMonth() === lastMonth && expenseDate.getFullYear() === lastMonthYear;
+      }
+      return true; // all_time
     });
 
+    return timeFilteredExpenses
+      .filter(tx => tx.splitBetween.includes(currentUser.id))
+      .map(tx => {
+        let userShare = 0;
+        if (tx.splitMethod === SplitMethod.SHARES && tx.splitShares) {
+            const totalShares = Object.values(tx.splitShares).reduce((sum, share) => sum + share, 0);
+            if (totalShares > 0) {
+                const memberShares = tx.splitShares?.[currentUser.id] || 0;
+                userShare = (tx.amount / totalShares) * memberShares;
+            }
+        } else { // Default to EQUAL split
+            if (tx.splitBetween.length > 0) {
+                userShare = tx.amount / tx.splitBetween.length;
+            }
+        }
+        return { ...tx, amount: userShare };
+      });
+  }, [groups, currentUser, timeFilter]);
 
-  const dataByCategory = userExpenses.reduce((acc, expense) => {
+
+  const dataByCategory = filteredUserExpenses.reduce((acc, expense) => {
     const category = expense.category;
     if (!acc[category]) {
       acc[category] = { name: category, value: 0 };
@@ -41,6 +81,7 @@ const InsightsPage: React.FC = () => {
 
   const chartData = Object.values(dataByCategory).filter(item => item.value > 0);
   const totalSpent = chartData.reduce((sum, item) => sum + item.value, 0);
+  const periodText = timeFilter === 'this_month' ? 'This Month' : timeFilter === 'last_month' ? 'Last Month' : 'All Time';
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
@@ -52,6 +93,29 @@ const InsightsPage: React.FC = () => {
     }
     return null;
   };
+  
+  const FilterButtons = () => (
+    <div className="flex justify-center mb-6 bg-slate-900/50 p-1 rounded-lg border border-slate-700 w-full max-w-xs mx-auto">
+      <button
+        onClick={() => setTimeFilter('this_month')}
+        className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md focus:outline-none transition-colors ${timeFilter === 'this_month' ? 'bg-cyan-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}
+      >
+        This Month
+      </button>
+      <button
+        onClick={() => setTimeFilter('last_month')}
+        className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md focus:outline-none transition-colors ${timeFilter === 'last_month' ? 'bg-cyan-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}
+      >
+        Last Month
+      </button>
+      <button
+        onClick={() => setTimeFilter('all_time')}
+        className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md focus:outline-none transition-colors ${timeFilter === 'all_time' ? 'bg-cyan-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}
+      >
+        All Time
+      </button>
+    </div>
+  );
 
   return (
     <div className="p-4">
@@ -60,8 +124,10 @@ const InsightsPage: React.FC = () => {
         <p className="text-slate-400">Your Spending Summary</p>
       </header>
 
+      <FilterButtons />
+
       <div className="bg-slate-800 p-4 rounded-lg shadow border border-slate-700">
-        <h2 className="text-xl font-semibold text-center mb-2 text-white">Total Share: ₹{totalSpent.toFixed(2)}</h2>
+        <h2 className="text-xl font-semibold text-center mb-2 text-white">Total Share ({periodText}): ₹{totalSpent.toFixed(2)}</h2>
         
         {chartData.length > 0 ? (
             <>
@@ -112,7 +178,7 @@ const InsightsPage: React.FC = () => {
                 </div>
             </>
         ) : (
-            <p className="text-center text-slate-400 py-10">No spending data to display.</p>
+            <p className="text-center text-slate-400 py-10">No spending data for this period.</p>
         )}
       </div>
     </div>

@@ -38,10 +38,10 @@ export const calculateBalances = (group: Group, currentUserId: string): Balance[
       }
     } else { // It's a Settlement
         const settlement = transaction as Settlement;
-        // Person who paid gets debit (they gave away money)
-        balances.set(settlement.fromId, (balances.get(settlement.fromId) || 0) - settlement.amount);
-        // Person who received gets credit
-        balances.set(settlement.toId, (balances.get(settlement.toId) || 0) + settlement.amount);
+        // The person who paid (fromId) is settling their debt, so their balance increases (becomes less negative).
+        balances.set(settlement.fromId, (balances.get(settlement.fromId) || 0) + settlement.amount);
+        // The person who received (toId) has been paid back, so their credit decreases (becomes less positive).
+        balances.set(settlement.toId, (balances.get(settlement.toId) || 0) - settlement.amount);
     }
   });
   
@@ -100,9 +100,11 @@ export const calculateGlobalBalances = (groups: Group[], allUsers: User[], curre
                 const { fromId, toId, amount } = settlement;
 
                 if (fromId === currentUserId) {
-                    netBalances.set(toId, (netBalances.get(toId) || 0) - amount);
+                    // I paid someone. The amount I owe them decreases, so my balance with them increases (moves towards positive).
+                    netBalances.set(toId, (netBalances.get(toId) || 0) + amount);
                 } else if (toId === currentUserId) {
-                    netBalances.set(fromId, (netBalances.get(fromId) || 0) + amount);
+                    // Someone paid me. The amount they owe me decreases, so my balance with them decreases (moves towards negative).
+                    netBalances.set(fromId, (netBalances.get(fromId) || 0) - amount);
                 }
             }
         });

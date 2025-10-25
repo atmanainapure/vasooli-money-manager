@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 import { calculateBalances } from '../utils/calculations';
 import { Transaction, Expense, Settlement, Group, User, Category, SplitMethod } from '../types';
@@ -211,89 +211,6 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ isOpen, onClose, grou
     );
 };
 
-type SettleUpModalProps = {
-    isOpen: boolean;
-    onClose: () => void;
-    group: Group;
-    currentUser: User;
-    settleUp: (settlement: Omit<Settlement, 'id' | 'date'>) => Promise<void>;
-    editTransaction: (tx: Transaction) => Promise<void>;
-    settlementToEdit: Settlement | null;
-};
-
-const SettleUpModal: React.FC<SettleUpModalProps> = ({ isOpen, onClose, group, currentUser, settleUp, editTransaction, settlementToEdit }) => {
-    const isEditMode = !!settlementToEdit;
-    const [fromId, setFromId] = useState(currentUser.id);
-    const [toId, setToId] = useState('');
-    const [amount, setAmount] = useState('');
-
-    useEffect(() => {
-        if(isOpen) {
-            if (isEditMode && settlementToEdit) {
-                setFromId(settlementToEdit.fromId);
-                setToId(settlementToEdit.toId);
-                setAmount(settlementToEdit.amount.toString());
-            } else {
-                const otherMembers = group.members.filter(m => m.id !== currentUser.id);
-                setFromId(currentUser.id);
-                setToId(otherMembers.length > 0 ? otherMembers[0].id : '');
-                setAmount('');
-            }
-        }
-    }, [isOpen, isEditMode, settlementToEdit, group, currentUser]);
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const numericAmount = parseFloat(amount);
-        if (!fromId || !toId || fromId === toId || !numericAmount || numericAmount <= 0) {
-            alert('Please select two different people and enter a valid amount.');
-            return;
-        }
-
-        const payload: Omit<Settlement, 'id' | 'date'> = {
-            groupId: group.id,
-            fromId,
-            toId,
-            amount: numericAmount,
-        };
-
-        if (isEditMode && settlementToEdit) {
-            await editTransaction({ ...settlementToEdit, ...payload });
-        } else {
-            await settleUp(payload);
-        }
-        
-        onClose();
-    };
-
-    const inputClass = "mt-1 block w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md shadow-sm text-white placeholder-slate-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500";
-
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title={isEditMode ? "Edit Settlement" : "Settle Up"}>
-            <form onSubmit={handleSubmit} className="space-y-4">
-                 <div>
-                    <label htmlFor="fromId" className="block text-sm font-medium text-slate-300">From</label>
-                    <select id="fromId" value={fromId} onChange={e => setFromId(e.target.value)} className={inputClass}>
-                        {group.members.map(member => <option key={member.id} value={member.id}>{member.name}</option>)}
-                    </select>
-                </div>
-                <div>
-                    <label htmlFor="toId" className="block text-sm font-medium text-slate-300">To</label>
-                    <select id="toId" value={toId} onChange={e => setToId(e.target.value)} className={inputClass}>
-                        {group.members.map(member => <option key={member.id} value={member.id}>{member.name}</option>)}
-                    </select>
-                </div>
-                 <div>
-                    <label htmlFor="settleAmount" className="block text-sm font-medium text-slate-300">Amount (₹)</label>
-                    <input type="number" id="settleAmount" value={amount} onChange={e => setAmount(e.target.value)} className={inputClass} />
-                </div>
-                <div className="flex justify-end pt-2">
-                    <button type="submit" className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 focus:ring-offset-slate-800">{isEditMode ? 'Save Changes' : 'Settle Up'}</button>
-                </div>
-            </form>
-        </Modal>
-    );
-};
 
 const BalancePill: React.FC<{ amount: number }> = ({ amount }) => {
     const isPositive = amount > 0.01;
@@ -312,13 +229,14 @@ const BalancePill: React.FC<{ amount: number }> = ({ amount }) => {
 interface TransactionCardProps {
     transaction: Transaction;
     members: User[];
+    currentUser: User;
     onEdit: (tx: Transaction) => void;
     onDelete: (tx: Transaction) => void;
     onMenuToggle: () => void;
     isMenuOpen: boolean;
 }
 
-const TransactionCard: React.FC<TransactionCardProps> = ({ transaction, members, onEdit, onDelete, onMenuToggle, isMenuOpen }) => {
+const TransactionCard: React.FC<TransactionCardProps> = ({ transaction, members, currentUser, onEdit, onDelete, onMenuToggle, isMenuOpen }) => {
     const isExpense = 'paidById' in transaction;
     const baseClass = "bg-slate-800 p-4 rounded-lg flex items-center space-x-4 border border-slate-700 transition-transform duration-200 hover:scale-[1.02] hover:bg-slate-700/60";
 
@@ -334,19 +252,38 @@ const TransactionCard: React.FC<TransactionCardProps> = ({ transaction, members,
                 <p className="text-xs text-slate-500">{new Date(transaction.date).toLocaleDateString()}</p>
             </div>
         </>
-    ) : (
-        <>
-            <div className="text-3xl p-3 bg-slate-700 rounded-full">🤝</div>
-            <div className="flex-grow">
-                <p className="font-semibold text-slate-100">{members.find(m => m.id === (transaction as Settlement).fromId)?.name} paid {members.find(m => m.id === (transaction as Settlement).toId)?.name}</p>
-                <p className="text-sm text-slate-400">Settlement</p>
-            </div>
-            <div className="text-right">
-                <p className="font-bold text-lg text-green-400">₹{(transaction as Settlement).amount.toFixed(2)}</p>
-                <p className="text-xs text-slate-500">{new Date(transaction.date).toLocaleDateString()}</p>
-            </div>
-        </>
-    );
+    ) : (() => {
+        const settlement = transaction as Settlement;
+        const fromUser = members.find(m => m.id === settlement.fromId);
+        const toUser = members.find(m => m.id === settlement.toId);
+
+        let settlementText = '';
+        let amountColor = 'text-slate-400'; // Neutral as default
+
+        if (fromUser?.id === currentUser.id) {
+            settlementText = `You paid ${toUser?.name || 'someone'}`;
+            amountColor = 'text-rose-400'; // Money out for current user
+        } else if (toUser?.id === currentUser.id) {
+            settlementText = `${fromUser?.name || 'Someone'} paid you`;
+            amountColor = 'text-green-400'; // Money in for current user
+        } else {
+            settlementText = `${fromUser?.name || 'Someone'} paid ${toUser?.name || 'someone'}`;
+        }
+        
+        return (
+             <>
+                <div className="text-3xl p-3 bg-green-500/10 rounded-full">🤝</div>
+                <div className="flex-grow">
+                    <p className="font-semibold text-slate-100">{settlementText}</p>
+                    <p className="text-sm text-slate-400">Settlement</p>
+                </div>
+                <div className="text-right">
+                    <p className={`font-bold text-lg ${amountColor}`}>₹{settlement.amount.toFixed(2)}</p>
+                    <p className="text-xs text-slate-500">{new Date(transaction.date).toLocaleDateString()}</p>
+                </div>
+            </>
+        );
+    })();
 
     return (
         <div className="relative">
@@ -358,10 +295,12 @@ const TransactionCard: React.FC<TransactionCardProps> = ({ transaction, members,
             </button>
             {isMenuOpen && (
                 <div className="absolute top-10 right-2 bg-slate-900 border border-slate-700 rounded-md shadow-lg z-20 w-32 py-1">
-                    <button onClick={() => { onEdit(transaction); onMenuToggle(); }} className="flex items-center w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-slate-700">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
-                        Edit
-                    </button>
+                    {isExpense && 
+                        <button onClick={() => { onEdit(transaction); onMenuToggle(); }} className="flex items-center w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-slate-700">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
+                            Edit
+                        </button>
+                    }
                     <button onClick={() => { onDelete(transaction); onMenuToggle(); }} className="flex items-center w-full text-left px-3 py-2 text-sm text-rose-400 hover:bg-slate-700">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                         Delete
@@ -374,13 +313,14 @@ const TransactionCard: React.FC<TransactionCardProps> = ({ transaction, members,
 
 const GroupDetailPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
-    const { groups, currentUser, loading, addExpense, settleUp, editTransaction, deleteTransaction } = useData();
+    const navigate = useNavigate();
+    const { groups, currentUser, loading, addExpense, editTransaction, deleteTransaction, deleteGroup } = useData();
     const [isAddExpenseModalOpen, setAddExpenseModalOpen] = useState(false);
-    const [isSettleUpModalOpen, setSettleUpModalOpen] = useState(false);
+    const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [isHeaderMenuOpen, setHeaderMenuOpen] = useState(false);
     const [search, setSearch] = useState('');
     const [menuTransactionId, setMenuTransactionId] = useState<string | null>(null);
     const [expenseToEdit, setExpenseToEdit] = useState<Expense | null>(null);
-    const [settlementToEdit, setSettlementToEdit] = useState<Settlement | null>(null);
 
     const group = groups.find(g => g.id === id);
 
@@ -393,6 +333,7 @@ const GroupDetailPage: React.FC = () => {
     }
 
     const balances = calculateBalances(group, currentUser.id);
+    const isAllSettledUp = balances.every(b => Math.abs(b.amount) < 0.01);
     const sortedTransactions = [...group.transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     
     const handleStartEdit = (tx: Transaction) => {
@@ -400,14 +341,26 @@ const GroupDetailPage: React.FC = () => {
             setExpenseToEdit(tx as Expense);
             setAddExpenseModalOpen(true);
         } else {
-            setSettlementToEdit(tx as Settlement);
-            setSettleUpModalOpen(true);
+            // Settlements can only be created from the simplified tab, so editing is disabled here for consistency.
+            alert("Settlements can only be managed from the 'Simplified' tab.");
         }
     };
     
-    const handleDelete = (tx: Transaction) => {
+    const handleDeleteTransaction = (tx: Transaction) => {
         if (window.confirm('Are you sure you want to delete this transaction? This action cannot be undone.')) {
             deleteTransaction(tx.groupId, tx.id);
+        }
+    };
+
+    const handleDeleteGroup = async () => {
+        if (group) {
+            try {
+                await deleteGroup(group.id);
+                navigate('/');
+            } catch (error) {
+                console.error("Failed to delete group:", error);
+                alert("There was an error deleting the group. Please try again.");
+            }
         }
     };
 
@@ -426,27 +379,57 @@ const GroupDetailPage: React.FC = () => {
 
     return (
         <div>
-            <header className="sticky top-0 bg-slate-800/80 backdrop-blur-sm border-b border-slate-700 z-30 p-4 flex items-center">
-                <Link to="/" className="mr-4 text-slate-300 hover:text-cyan-400">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                </Link>
-                <h1 className="text-xl font-bold text-white">{group.name}</h1>
+            <header className="sticky top-0 bg-slate-800/80 backdrop-blur-sm border-b border-slate-700 z-30 p-4 flex items-center justify-between">
+                <div className="flex items-center">
+                    <Link to="/" className="mr-4 text-slate-300 hover:text-cyan-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                    </Link>
+                    <h1 className="text-xl font-bold text-white">{group.name}</h1>
+                </div>
+                <div className="relative">
+                    <button onClick={() => setHeaderMenuOpen(prev => !prev)} className="p-2 rounded-full text-slate-300 hover:bg-slate-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" /></svg>
+                    </button>
+                    {isHeaderMenuOpen && (
+                        <div className="absolute top-12 right-0 bg-slate-900 border border-slate-700 rounded-md shadow-lg z-30 w-48 py-1">
+                             <button 
+                                onClick={() => { setDeleteModalOpen(true); setHeaderMenuOpen(false); }} 
+                                className="flex items-center w-full text-left px-4 py-2 text-sm text-rose-400 hover:bg-slate-700"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                Delete Group
+                            </button>
+                        </div>
+                    )}
+                </div>
             </header>
 
             <div className="p-4">
                 <section className="mb-6 bg-slate-950 p-4 rounded-lg border border-slate-800 shadow-lg">
                     <h2 className="text-lg font-semibold mb-3 text-white">Balances</h2>
-                    <div className="space-y-3">
-                        {balances.map(({ user, amount }) => (
-                            <div key={user.id} className="flex items-center justify-between">
-                                <div className="flex items-center space-x-3">
-                                    <img src={user.avatarUrl} alt={user.name} className="h-10 w-10 rounded-full" />
-                                    <span className="font-medium text-slate-300">{user.name}</span>
-                                </div>
-                                <BalancePill amount={amount} />
+                    {isAllSettledUp ? (
+                        <div className="text-center py-4">
+                            <div className="inline-block p-3 bg-green-500/10 rounded-full mb-3">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
                             </div>
-                        ))}
-                    </div>
+                            <h3 className="font-semibold text-green-400">All Settled Up!</h3>
+                            <p className="text-sm text-slate-400">All balances in this group are zero.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {balances.map(({ user, amount }) => (
+                                <div key={user.id} className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-3">
+                                        <img src={user.avatarUrl} alt={user.name} className="h-10 w-10 rounded-full" />
+                                        <span className="font-medium text-slate-300">{user.name}</span>
+                                    </div>
+                                    <BalancePill amount={amount} />
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </section>
                 
                 <section>
@@ -466,11 +449,12 @@ const GroupDetailPage: React.FC = () => {
                                 <TransactionCard 
                                     key={tx.id} 
                                     transaction={tx} 
-                                    members={group.members} 
+                                    members={group.members}
+                                    currentUser={currentUser}
                                     isMenuOpen={menuTransactionId === tx.id}
                                     onMenuToggle={() => setMenuTransactionId(prev => (prev === tx.id ? null : tx.id))}
                                     onEdit={handleStartEdit}
-                                    onDelete={handleDelete}
+                                    onDelete={handleDeleteTransaction}
                                 />
                             ))}
                         </div>
@@ -483,9 +467,6 @@ const GroupDetailPage: React.FC = () => {
             </div>
             
             <div className="fixed bottom-4 right-4 flex flex-col items-end space-y-3 z-20">
-                 <button onClick={() => setSettleUpModalOpen(true)} className="bg-amber-500 text-white rounded-full p-3 shadow-lg shadow-amber-500/20 hover:bg-amber-600 transition-transform hover:scale-110" aria-label="Settle up">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01" /></svg>
-                 </button>
                  <button onClick={() => setAddExpenseModalOpen(true)} className="bg-cyan-500 text-white rounded-full p-4 shadow-lg shadow-cyan-500/30 hover:bg-cyan-600 transition-transform hover:scale-110" aria-label="Add expense">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                  </button>
@@ -500,17 +481,23 @@ const GroupDetailPage: React.FC = () => {
                 editTransaction={editTransaction}
                 expenseToEdit={expenseToEdit}
             />
-            
-            <SettleUpModal
-                isOpen={isSettleUpModalOpen}
-                onClose={() => { setSettleUpModalOpen(false); setSettlementToEdit(null); }}
-                group={group}
-                currentUser={currentUser}
-                settleUp={settleUp}
-                editTransaction={editTransaction}
-                settlementToEdit={settlementToEdit}
-            />
 
+            <Modal isOpen={isDeleteModalOpen} onClose={() => setDeleteModalOpen(false)} title="Delete Group">
+                <div className="text-slate-300">
+                    <p className="mb-4">Are you sure you want to delete the group <strong className="font-semibold text-white">"{group.name}"</strong>?</p>
+                    <p className="text-sm text-amber-400 bg-amber-500/10 p-3 rounded-md border border-amber-500/30">
+                        <strong>Warning:</strong> This will permanently delete all associated transactions. This action cannot be undone.
+                    </p>
+                    <div className="flex justify-end space-x-3 mt-6">
+                        <button onClick={() => setDeleteModalOpen(false)} className="px-4 py-2 rounded-md text-sm font-medium bg-slate-600 hover:bg-slate-500 text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 focus:ring-offset-slate-800">
+                            Cancel
+                        </button>
+                        <button onClick={handleDeleteGroup} className="px-4 py-2 rounded-md text-sm font-medium bg-rose-600 hover:bg-rose-700 text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500 focus:ring-offset-slate-800">
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 };

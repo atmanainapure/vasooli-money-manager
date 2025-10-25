@@ -39,6 +39,13 @@ const App: React.FC = () => {
 };
 
 const MainApp: React.FC = () => {
+    useEffect(() => {
+        // Request notification permission once the user is logged in
+        if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+            Notification.requestPermission();
+        }
+    }, []);
+
     return (
       <HashRouter>
         <Main />

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
@@ -14,3 +13,18 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
+// Register the service worker for PWA capabilities
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    // Construct the full URL to the service worker to ensure it's loaded from the correct origin.
+    const swUrl = `${window.location.origin}/service-worker.js`;
+    navigator.serviceWorker.register(swUrl)
+      .then(registration => {
+        console.log('Service Worker registered with scope:', registration.scope);
+      })
+      .catch(error => {
+        console.error('Service Worker registration failed:', error);
+      });
+  });
+}

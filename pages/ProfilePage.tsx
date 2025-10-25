@@ -35,7 +35,7 @@ const ProfilePage: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
-    if (currentUser?.monthlyLimit) {
+    if (currentUser?.monthlyLimit !== undefined) {
       setLimit(currentUser.monthlyLimit.toString());
     } else {
       setLimit('');

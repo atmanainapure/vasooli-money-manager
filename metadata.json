@@ -1,0 +1,5 @@
+{
+  "name": "Vasooli",
+  "description": "A group expense splitting application, inspired by Splitwise, to help users create groups, add shared expenses, and easily track who owes whom.",
+  "requestFramePermissions": []
+}
